@@ -18,7 +18,7 @@ dependencies {
     implementation 'org.mongodb:mongo-java-driver:3.12.10'
     implementation 'com.bgsoftware.common.config:CommentedConfiguration:latest'
 
-    compileOnly files('D:\\workspace\\SuperiorSkyblock2\\target\\SuperiorSkyblock2API.jar')
+    compileOnly 'com.bgsoftware:SuperiorSkyblockAPI:latest'
     compileOnly 'org.spigotmc:v1_8_R3:latest'
 }
 
