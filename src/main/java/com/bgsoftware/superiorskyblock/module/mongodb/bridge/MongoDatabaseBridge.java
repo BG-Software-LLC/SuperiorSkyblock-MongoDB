@@ -48,9 +48,10 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
             this.batchOperations = new HashMap<>();
         }
         else if(this.batchOperations != null) {
-            Map<MongoCollection<Document>, List<WriteModel<Document>>> batchOperationsCopy = new HashMap<>(this.batchOperations);
-            this.batchOperations = null;
-            DatabaseExecutor.execute(() -> batchOperationsCopy.forEach(MongoCollection::bulkWrite));
+            DatabaseExecutor.execute(() -> {
+                this.batchOperations.forEach(MongoCollection::bulkWrite);
+                this.batchOperations = null;
+            });
         }
     }
 
