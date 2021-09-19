@@ -1,0 +1,9 @@
+######################################################
+##                                                  ##
+##                SuperiorSkyblock 2                ##
+##                Developed by Ome_R                ##
+##                                                  ##
+######################################################
+
+url: 'mongodb://localhost:27017'
+database: 'SuperiorSkyblock'
