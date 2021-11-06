@@ -9,6 +9,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.DeleteOneModel;
+import com.mongodb.client.model.InsertOneModel;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.WriteModel;
@@ -54,10 +55,9 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
 
     @Override
     public void batchOperations(boolean batchOperations) {
-        if(batchOperations) {
+        if (batchOperations) {
             this.batchOperations = new HashMap<>();
-        }
-        else if(this.batchOperations != null) {
+        } else if (this.batchOperations != null) {
             DatabaseExecutor.execute(() -> {
                 this.batchOperations.forEach(MongoCollection::bulkWrite);
                 this.batchOperations = null;
@@ -67,7 +67,7 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
 
     @Override
     public void updateObject(String collectionName, DatabaseFilter filter, Pair<String, Object>[] columns) {
-        if(!shouldSaveData)
+        if (!shouldSaveData)
             return;
 
         DatabaseExecutor.execute(() -> {
@@ -75,11 +75,10 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
             Bson query = buildFilter(filter);
             Document document = new Document().append("$set", buildDocument(columns));
 
-            if(this.batchOperations != null) {
+            if (this.batchOperations != null) {
                 this.batchOperations.computeIfAbsent(collection, c -> new ArrayList<>())
                         .add(new UpdateOneModel<>(query, document));
-            }
-            else {
+            } else {
                 collection.updateOne(query, document);
             }
         });
@@ -88,27 +87,45 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
     @SafeVarargs
     @Override
     public final void insertObject(String collectionName, Pair<String, Object>... columns) {
-        if(!shouldSaveData)
+        if (!shouldSaveData)
             return;
 
         DatabaseExecutor.execute(() -> {
             MongoCollection<Document> collection = MongoDBClient.getCollection(collectionName);
-            Document filter = collection.listIndexes().cursor().next();
-            Document document = new Document().append("$set", buildDocument(columns));
-
-            if(this.batchOperations != null) {
-                this.batchOperations.computeIfAbsent(collection, c -> new ArrayList<>())
-                        .add(new UpdateOneModel<>(filter, document, new UpdateOptions().upsert(true)));
-            }
-            else {
-                collection.updateOne(filter, document, new UpdateOptions().upsert(true));
+            MongoCursor<Document> cursor = collection.listIndexes().cursor();
+            if (cursor.hasNext()) {
+                _updateObject(collection, cursor.next(), buildDocument(columns));
+            } else {
+                _insertObject(collection, buildDocument(columns));
             }
         });
     }
 
+    private void _updateObject(MongoCollection<Document> collection, Document filter, Document columns) {
+        Document document = new Document().append("$set", columns);
+
+        if (this.batchOperations != null) {
+            this.batchOperations.computeIfAbsent(collection, c -> new ArrayList<>())
+                    .add(new UpdateOneModel<>(filter, document, new UpdateOptions().upsert(true)));
+        } else {
+            collection.updateOne(filter, document, new UpdateOptions().upsert(true));
+        }
+    }
+
+    private void _insertObject(MongoCollection<Document> collection, Document columns) {
+        Document document = new Document().append("$set", columns);
+
+        if (this.batchOperations != null) {
+            this.batchOperations.computeIfAbsent(collection, c -> new ArrayList<>())
+                    .add(new InsertOneModel<>(document));
+        } else {
+            collection.insertOne(document);
+        }
+    }
+
     @Override
     public void deleteObject(String collectionName, DatabaseFilter filter) {
-        if(!shouldSaveData)
+        if (!shouldSaveData)
             return;
 
         DatabaseExecutor.execute(() -> {
@@ -116,11 +133,10 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
 
             Bson query = buildFilter(filter);
 
-            if(this.batchOperations != null) {
+            if (this.batchOperations != null) {
                 this.batchOperations.computeIfAbsent(collection, c -> new ArrayList<>())
                         .add(new DeleteOneModel<>(query));
-            }
-            else {
+            } else {
                 collection.deleteOne(query);
             }
         });
@@ -137,10 +153,10 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
         });
     }
 
-    private static BasicDBObject buildFilter(DatabaseFilter filter){
+    private static BasicDBObject buildFilter(DatabaseFilter filter) {
         BasicDBObject query = new BasicDBObject();
 
-        if(filter != null) {
+        if (filter != null) {
             filter.getFilters().forEach(columnFilter -> query.append(columnFilter.getKey(), columnFilter.getValue()));
         }
 
@@ -150,8 +166,8 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
     private static Document buildDocument(Pair<String, Object>[] columns) {
         Document document = new Document();
 
-        if(columns != null) {
-            for(Pair<String, Object> column : columns) {
+        if (columns != null) {
+            for (Pair<String, Object> column : columns) {
                 document.append(column.getKey(), column.getValue());
             }
         }
