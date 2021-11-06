@@ -13,22 +13,22 @@ public final class MongoDatabaseBridgeFactory implements DatabaseBridgeFactory {
 
     @Override
     public DatabaseBridge createIslandsDatabaseBridge(@Nullable Island island, DatabaseBridge databaseBridge) {
-        return new MongoDatabaseBridge();
+        return MongoDatabaseBridge.getInstance();
     }
 
     @Override
     public DatabaseBridge createPlayersDatabaseBridge(@Nullable SuperiorPlayer superiorPlayer, DatabaseBridge databaseBridge) {
-        return new MongoDatabaseBridge();
+        return MongoDatabaseBridge.getInstance();
     }
 
     @Override
     public DatabaseBridge createGridDatabaseBridge(@Nullable GridManager gridManager, DatabaseBridge databaseBridge) {
-        return new MongoDatabaseBridge();
+        return MongoDatabaseBridge.getInstance();
     }
 
     @Override
     public DatabaseBridge createStackedBlocksDatabaseBridge(@Nullable StackedBlocksManager stackedBlocksManager, DatabaseBridge databaseBridge) {
-        return new MongoDatabaseBridge();
+        return MongoDatabaseBridge.getInstance();
     }
 
 }

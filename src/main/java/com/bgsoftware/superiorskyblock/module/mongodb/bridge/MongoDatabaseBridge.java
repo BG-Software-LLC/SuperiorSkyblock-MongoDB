@@ -23,8 +23,18 @@ import java.util.function.Consumer;
 
 public final class MongoDatabaseBridge implements DatabaseBridge {
 
+    private static final MongoDatabaseBridge INSTANCE = new MongoDatabaseBridge();
+
     private boolean shouldSaveData = false;
     private Map<MongoCollection<Document>, List<WriteModel<Document>>> batchOperations;
+
+    public static MongoDatabaseBridge getInstance() {
+        return INSTANCE;
+    }
+
+    private MongoDatabaseBridge() {
+
+    }
 
     @Override
     public void loadAllObjects(String collectionName, Consumer<Map<String, Object>> resultConsumer) {
