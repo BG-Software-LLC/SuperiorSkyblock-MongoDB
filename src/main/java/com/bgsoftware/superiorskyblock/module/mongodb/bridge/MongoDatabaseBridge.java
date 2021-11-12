@@ -102,13 +102,11 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
     }
 
     private void _updateObject(MongoCollection<Document> collection, Document filter, Document columns) {
-        Document document = new Document().append("$set", columns);
-
         if (this.batchOperations != null) {
             this.batchOperations.computeIfAbsent(collection, c -> new ArrayList<>())
-                    .add(new UpdateOneModel<>(filter, document, new UpdateOptions().upsert(true)));
+                    .add(new UpdateOneModel<>(filter, columns, new UpdateOptions().upsert(true)));
         } else {
-            collection.updateOne(filter, document, new UpdateOptions().upsert(true));
+            collection.updateOne(filter, columns, new UpdateOptions().upsert(true));
         }
     }
 
