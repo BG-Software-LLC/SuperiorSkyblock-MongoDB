@@ -16,9 +16,9 @@ repositories {
 
 dependencies {
     implementation 'org.mongodb:mongo-java-driver:3.12.10'
-    implementation 'com.bgsoftware.common.config:CommentedConfiguration:latest'
+    implementation 'com.bgsoftware.common.config:CommentedConfiguration:1.0.3'
 
-    compileOnly 'com.bgsoftware:SuperiorSkyblockAPI:latest'
+    compileOnly 'com.bgsoftware:SuperiorSkyblockAPI:1.10.1'
     compileOnly 'org.spigotmc:v1_8_R3:latest'
 }
 

@@ -1,6 +1,7 @@
 package com.bgsoftware.superiorskyblock.module.mongodb.bridge;
 
 import com.bgsoftware.superiorskyblock.api.data.DatabaseBridge;
+import com.bgsoftware.superiorskyblock.api.data.DatabaseBridgeMode;
 import com.bgsoftware.superiorskyblock.api.data.DatabaseFilter;
 import com.bgsoftware.superiorskyblock.api.objects.Pair;
 import com.bgsoftware.superiorskyblock.module.mongodb.MongoDBClient;
@@ -26,7 +27,7 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
 
     private static final MongoDatabaseBridge INSTANCE = new MongoDatabaseBridge();
 
-    private boolean shouldSaveData = false;
+    private DatabaseBridgeMode databaseBridgeMode = DatabaseBridgeMode.IDLE;
     private Map<MongoCollection<Document>, List<WriteModel<Document>>> batchOperations;
 
     public static MongoDatabaseBridge getInstance() {
@@ -49,8 +50,8 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
     }
 
     @Override
-    public void startSavingData() {
-        shouldSaveData = true;
+    public void setDatabaseBridgeMode(DatabaseBridgeMode databaseBridgeMode) {
+        this.databaseBridgeMode = databaseBridgeMode;
     }
 
     @Override
@@ -67,7 +68,7 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
 
     @Override
     public void updateObject(String collectionName, DatabaseFilter filter, Pair<String, Object>[] columns) {
-        if (!shouldSaveData)
+        if (databaseBridgeMode != DatabaseBridgeMode.SAVE_DATA)
             return;
 
         DatabaseExecutor.execute(() -> {
@@ -87,7 +88,7 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
     @SafeVarargs
     @Override
     public final void insertObject(String collectionName, Pair<String, Object>... columns) {
-        if (!shouldSaveData)
+        if (databaseBridgeMode != DatabaseBridgeMode.SAVE_DATA)
             return;
 
         DatabaseExecutor.execute(() -> {
@@ -123,7 +124,7 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
 
     @Override
     public void deleteObject(String collectionName, DatabaseFilter filter) {
-        if (!shouldSaveData)
+        if (databaseBridgeMode != DatabaseBridgeMode.SAVE_DATA)
             return;
 
         DatabaseExecutor.execute(() -> {
