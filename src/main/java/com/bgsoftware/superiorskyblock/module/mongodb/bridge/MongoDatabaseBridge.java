@@ -6,19 +6,22 @@ import com.bgsoftware.superiorskyblock.api.data.DatabaseFilter;
 import com.bgsoftware.superiorskyblock.api.objects.Pair;
 import com.bgsoftware.superiorskyblock.module.mongodb.MongoDBClient;
 import com.bgsoftware.superiorskyblock.module.mongodb.threading.DatabaseExecutor;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.DeleteOneModel;
+import com.mongodb.client.model.DeleteManyModel;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.InsertOneModel;
-import com.mongodb.client.model.UpdateOneModel;
-import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.ReplaceOneModel;
+import com.mongodb.client.model.ReplaceOptions;
+import com.mongodb.client.model.UpdateManyModel;
 import com.mongodb.client.model.WriteModel;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -33,13 +36,12 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
 
     @Override
     public void loadAllObjects(String collectionName, Consumer<Map<String, Object>> resultConsumer) {
-        DatabaseExecutor.execute(() -> {
-            MongoCollection<Document> collection = MongoDBClient.getCollection(collectionName);
-            MongoCursor<Document> cursor = collection.find().cursor();
+        MongoCollection<Document> collection = MongoDBClient.getCollection(collectionName);
+        try (MongoCursor<Document> cursor = collection.find().cursor()) {
             while (cursor.hasNext()) {
                 resultConsumer.accept(cursor.next());
             }
-        });
+        }
     }
 
     @Override
@@ -47,10 +49,9 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
         if (batchOperations) {
             this.batchOperations = new HashMap<>();
         } else if (this.batchOperations != null) {
-            DatabaseExecutor.execute(() -> {
-                this.batchOperations.forEach(MongoCollection::bulkWrite);
-                this.batchOperations = null;
-            });
+            Map<MongoCollection<Document>, List<WriteModel<Document>>> batchOperationsCopy = this.batchOperations;
+            this.batchOperations = null;
+            DatabaseExecutor.execute(() -> batchOperationsCopy.forEach(MongoCollection::bulkWrite));
         }
     }
 
@@ -62,13 +63,13 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
         DatabaseExecutor.execute(() -> {
             MongoCollection<Document> collection = MongoDBClient.getCollection(collectionName);
             Bson query = buildFilter(filter);
-            Document document = new Document().append("$set", buildDocument(columns));
+            Document updateOperation = new Document("$set", buildColumns(columns));
 
             if (this.batchOperations != null) {
                 this.batchOperations.computeIfAbsent(collection, c -> new ArrayList<>())
-                        .add(new UpdateOneModel<>(query, document));
+                        .add(new UpdateManyModel<>(query, updateOperation));
             } else {
-                collection.updateOne(query, document);
+                collection.updateMany(query, updateOperation);
             }
         });
     }
@@ -81,11 +82,19 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
 
         DatabaseExecutor.execute(() -> {
             MongoCollection<Document> collection = MongoDBClient.getCollection(collectionName);
-            MongoCursor<Document> cursor = collection.listIndexes().cursor();
-            if (cursor.hasNext()) {
-                _updateObject(collection, cursor.next(), buildDocument(columns));
+            List<String> filteredFields = MongoDBClient.getCachedIndex(collectionName);
+            if (filteredFields == null) {
+                _insertObject(collection, buildColumns(columns));
             } else {
-                _insertObject(collection, buildDocument(columns));
+                List<Bson> filters = new LinkedList<>();
+
+                for (Pair<String, Object> column : columns) {
+                    if (filteredFields.contains(column.getKey())) {
+                        filters.add(Filters.eq(column.getKey(), column.getValue()));
+                    }
+                }
+
+                _replaceObject(collection, buildFiltersFromList(filters), buildColumns(columns));
             }
         });
     }
@@ -97,27 +106,25 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
 
         DatabaseExecutor.execute(() -> {
             MongoCollection<Document> collection = MongoDBClient.getCollection(collectionName);
-
             Bson query = buildFilter(filter);
 
             if (this.batchOperations != null) {
                 this.batchOperations.computeIfAbsent(collection, c -> new ArrayList<>())
-                        .add(new DeleteOneModel<>(query));
+                        .add(new DeleteManyModel<>(query));
             } else {
-                collection.deleteOne(query);
+                collection.deleteMany(query);
             }
         });
     }
 
     @Override
     public void loadObject(String collectionName, DatabaseFilter filter, Consumer<Map<String, Object>> resultConsumer) {
-        DatabaseExecutor.execute(() -> {
-            MongoCollection<Document> collection = MongoDBClient.getCollection(collectionName);
-            MongoCursor<Document> cursor = collection.find(buildFilter(filter)).cursor();
+        MongoCollection<Document> collection = MongoDBClient.getCollection(collectionName);
+        try (MongoCursor<Document> cursor = collection.find(buildFilter(filter)).cursor()) {
             while (cursor.hasNext()) {
                 resultConsumer.accept(cursor.next());
             }
-        });
+        }
     }
 
     @Override
@@ -130,42 +137,46 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
         return this.databaseBridgeMode;
     }
 
-    private void _updateObject(MongoCollection<Document> collection, Document filter, Document columns) {
+    private void _replaceObject(MongoCollection<Document> collection, Bson filter, Document columns) {
         if (this.batchOperations != null) {
             this.batchOperations.computeIfAbsent(collection, c -> new ArrayList<>())
-                    .add(new UpdateOneModel<>(filter, columns, new UpdateOptions().upsert(true)));
+                    .add(new ReplaceOneModel<>(filter, columns, new ReplaceOptions().upsert(true)));
         } else {
-            collection.updateOne(filter, columns, new UpdateOptions().upsert(true));
+            collection.replaceOne(filter, columns, new ReplaceOptions().upsert(true));
         }
     }
 
     private void _insertObject(MongoCollection<Document> collection, Document columns) {
-        Document document = new Document().append("$set", columns);
-
         if (this.batchOperations != null) {
             this.batchOperations.computeIfAbsent(collection, c -> new ArrayList<>())
-                    .add(new InsertOneModel<>(document));
+                    .add(new InsertOneModel<>(columns));
         } else {
-            collection.insertOne(document);
+            collection.insertOne(columns);
         }
     }
 
-    private static BasicDBObject buildFilter(DatabaseFilter filter) {
-        BasicDBObject query = new BasicDBObject();
+    private static Bson buildFilter(@Nullable DatabaseFilter filter) {
+        if (filter == null || filter.getFilters().isEmpty())
+            return Filters.empty();
 
-        if (filter != null) {
-            filter.getFilters().forEach(columnFilter -> query.append(columnFilter.getKey(), columnFilter.getValue()));
-        }
+        List<Bson> filters = new LinkedList<>();
 
-        return query;
+        filter.getFilters().forEach(columnFilter ->
+                filters.add(Filters.eq(columnFilter.getKey(), columnFilter.getValue())));
+
+        return buildFiltersFromList(filters);
     }
 
-    private static Document buildDocument(Pair<String, Object>[] columns) {
+    private static Bson buildFiltersFromList(List<Bson> filters) {
+        return filters.isEmpty() ? Filters.empty() : filters.size() == 1 ? filters.get(0) : Filters.and(filters);
+    }
+
+    private static Document buildColumns(Pair<String, Object>[] columns) {
         Document document = new Document();
 
         if (columns != null) {
             for (Pair<String, Object> column : columns) {
-                document.append(column.getKey(), column.getValue());
+                document.put(column.getKey(), column.getValue());
             }
         }
 
