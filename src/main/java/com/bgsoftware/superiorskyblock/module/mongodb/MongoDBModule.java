@@ -7,16 +7,13 @@ import com.bgsoftware.superiorskyblock.api.modules.PluginModule;
 import com.bgsoftware.superiorskyblock.module.mongodb.bridge.MongoDatabaseBridgeFactory;
 import com.bgsoftware.superiorskyblock.module.mongodb.threading.DatabaseExecutor;
 import org.bukkit.Bukkit;
-import org.bukkit.event.Listener;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.event.Listener;
 
 import java.io.File;
 import java.io.IOException;
 
 public final class MongoDBModule extends PluginModule {
-
-    private JavaPlugin plugin;
 
     public MongoDBModule() {
         super("SSB-MongoDB", "Ome_R");
@@ -24,8 +21,6 @@ public final class MongoDBModule extends PluginModule {
 
     @Override
     public void onEnable(SuperiorSkyblock plugin) {
-        this.plugin = (JavaPlugin) plugin;
-
         YamlConfiguration config;
 
         try {
@@ -77,9 +72,9 @@ public final class MongoDBModule extends PluginModule {
     }
 
     private YamlConfiguration loadConfigFile() throws IOException {
-        File configFile = new File(getDataFolder(), "config.yml");
+        File configFile = new File(getModuleFolder(), "config.yml");
 
-        if(!configFile.exists()) {
+        if (!configFile.exists()) {
             saveResource("config.yml");
         }
 

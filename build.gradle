@@ -5,7 +5,7 @@ plugins {
 }
 
 group 'SSB-MongoDB'
-version '1.0.0'
+version '1.0.1'
 
 repositories {
     mavenCentral()
@@ -15,10 +15,10 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.mongodb:mongo-java-driver:3.12.10'
+    implementation 'org.mongodb:mongo-java-driver:3.12.11'
     implementation 'com.bgsoftware.common.config:CommentedConfiguration:1.0.3'
 
-    compileOnly 'com.bgsoftware:SuperiorSkyblockAPI:1.10.1'
+    compileOnly 'com.bgsoftware:SuperiorSkyblockAPI:2022.8.1'
     compileOnly 'org.spigotmc:v1_8_R3:latest'
 }
 

@@ -25,17 +25,10 @@ import java.util.function.Consumer;
 
 public final class MongoDatabaseBridge implements DatabaseBridge {
 
-    private static final MongoDatabaseBridge INSTANCE = new MongoDatabaseBridge();
-
     private DatabaseBridgeMode databaseBridgeMode = DatabaseBridgeMode.IDLE;
     private Map<MongoCollection<Document>, List<WriteModel<Document>>> batchOperations;
 
-    public static MongoDatabaseBridge getInstance() {
-        return INSTANCE;
-    }
-
-    private MongoDatabaseBridge() {
-
+    public MongoDatabaseBridge() {
     }
 
     @Override
@@ -47,11 +40,6 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
                 resultConsumer.accept(cursor.next());
             }
         });
-    }
-
-    @Override
-    public void setDatabaseBridgeMode(DatabaseBridgeMode databaseBridgeMode) {
-        this.databaseBridgeMode = databaseBridgeMode;
     }
 
     @Override
@@ -102,26 +90,6 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
         });
     }
 
-    private void _updateObject(MongoCollection<Document> collection, Document filter, Document columns) {
-        if (this.batchOperations != null) {
-            this.batchOperations.computeIfAbsent(collection, c -> new ArrayList<>())
-                    .add(new UpdateOneModel<>(filter, columns, new UpdateOptions().upsert(true)));
-        } else {
-            collection.updateOne(filter, columns, new UpdateOptions().upsert(true));
-        }
-    }
-
-    private void _insertObject(MongoCollection<Document> collection, Document columns) {
-        Document document = new Document().append("$set", columns);
-
-        if (this.batchOperations != null) {
-            this.batchOperations.computeIfAbsent(collection, c -> new ArrayList<>())
-                    .add(new InsertOneModel<>(document));
-        } else {
-            collection.insertOne(document);
-        }
-    }
-
     @Override
     public void deleteObject(String collectionName, DatabaseFilter filter) {
         if (databaseBridgeMode != DatabaseBridgeMode.SAVE_DATA)
@@ -150,6 +118,36 @@ public final class MongoDatabaseBridge implements DatabaseBridge {
                 resultConsumer.accept(cursor.next());
             }
         });
+    }
+
+    @Override
+    public void setDatabaseBridgeMode(DatabaseBridgeMode databaseBridgeMode) {
+        this.databaseBridgeMode = databaseBridgeMode;
+    }
+
+    @Override
+    public DatabaseBridgeMode getDatabaseBridgeMode() {
+        return this.databaseBridgeMode;
+    }
+
+    private void _updateObject(MongoCollection<Document> collection, Document filter, Document columns) {
+        if (this.batchOperations != null) {
+            this.batchOperations.computeIfAbsent(collection, c -> new ArrayList<>())
+                    .add(new UpdateOneModel<>(filter, columns, new UpdateOptions().upsert(true)));
+        } else {
+            collection.updateOne(filter, columns, new UpdateOptions().upsert(true));
+        }
+    }
+
+    private void _insertObject(MongoCollection<Document> collection, Document columns) {
+        Document document = new Document().append("$set", columns);
+
+        if (this.batchOperations != null) {
+            this.batchOperations.computeIfAbsent(collection, c -> new ArrayList<>())
+                    .add(new InsertOneModel<>(document));
+        } else {
+            collection.insertOne(document);
+        }
     }
 
     private static BasicDBObject buildFilter(DatabaseFilter filter) {
